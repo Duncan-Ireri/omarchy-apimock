@@ -18,9 +18,20 @@ omarchy plugin enable ireri.apimock
 omarchy restart shell
 ```
 
-`install.sh` downloads the `omock` binary from the GitHub release and checks its
-SHA-256. There is only a Linux x86_64 build; on anything else run `./build.sh`,
-which needs the Go toolchain.
+`install.sh` downloads the `omock` binary from the GitHub release and checks it
+against the SHA-256 pinned in `checksums/`, which is committed to this repo and
+reviewed with the rest of the source — not against a checksum fetched from the
+same release. The build is reproducible (`-trimpath -buildvcs=false`,
+`CGO_ENABLED=0`, and the Go toolchain pinned in `backend/go.mod`), so you can
+verify it yourself:
+
+```bash
+./build.sh
+sha256sum bin/omock            # compare with checksums/omock-v<version>-linux-x86_64.sha256
+```
+
+There is only a Linux x86_64 build; on anything else run `./build.sh`, which
+needs the Go toolchain and produces the same bytes the release ships.
 
 Set the mappings path and port in the widget panel (or under Setup → Plugins →
 API Mock), then press Start.
@@ -111,6 +122,12 @@ Like every Omarchy plugin, `omock` runs inside `omarchy-shell` with your user
 account's permissions and is not sandboxed. It listens on the address in its
 settings (127.0.0.1 unless you change it), reads the mappings file you gave it,
 and only makes a webhook call when a stub asks for one.
+
+Setting the bind address to `0.0.0.0` exposes the mock to your network: anyone
+who can reach the port can drive it. The server caps request header and body
+sizes, applies read/write/idle timeouts, and bounds how many webhook calls can
+be in flight at once (extra ones are dropped and logged), but it does no
+authentication. Keep it on loopback unless you specifically need otherwise.
 
 To work on the plugin, `./dev-sync.sh` builds it and copies it into the plugins
 directory and triggers a reload. Run it again after each change.
