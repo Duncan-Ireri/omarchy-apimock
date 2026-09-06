@@ -18,7 +18,9 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          # Exact version: the pinned checksum in checksums/ is only reproducible
+          # against one toolchain. Keep in sync with go.mod's toolchain line.
+          go-version: "1.24.7"
           cache: false
 
       # Refuse a tag whose versions disagree: a mismatch means users install a
@@ -51,13 +53,27 @@ jobs:
           ! ldd ./bin/omock 2>&1 | grep -qi "=>"
           [[ "$(./bin/omock --version)" == "omock ${GITHUB_REF_NAME#v}" ]]
 
-      - name: Assemble assets
+      - name: Assemble and verify assets
         id: assets
         run: |
           set -euo pipefail
           asset="omock-${GITHUB_REF_NAME}-linux-x86_64"
           cp ./bin/omock "$asset"
           sha256sum "$asset" > "$asset.sha256"
+
+          # Refuse to publish a binary that disagrees with the checksum committed
+          # to the repo. Whoever cuts the release must first run ./build.sh and
+          # commit checksums/$asset.sha256 in a reviewed change.
+          pinned="checksums/$asset.sha256"
+          test -f "$pinned" || {
+            echo "::error::missing $pinned — commit the checksum from a reproducible build before tagging"
+            exit 1
+          }
+          sha256sum --check --status "$pinned" || {
+            echo "::error::built binary does not match $pinned"
+            sha256sum "$asset"; cat "$pinned"
+            exit 1
+          }
           echo "asset=$asset" >> "$GITHUB_OUTPUT"
 
       - name: Publish release

@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-# Download the checksum-verified omock helper matching this plugin's version.
+# Install the omock helper matching this plugin's version.
+#
+# The prebuilt binary is fetched from the GitHub release, then verified against
+# the SHA-256 committed in this repo at checksums/ — NOT against a checksum
+# downloaded alongside the binary. The release is mutable; a checksum served from
+# the same place is not an independent check. The pinned digest ships with the
+# reviewed source you just cloned, and the build is reproducible: run ./build.sh
+# on any machine with the Go toolchain and you get the exact same bytes.
 #
 # Run this once after `omarchy plugin add https://github.com/Duncan-Ireri/omarchy-apimock`.
 # On anything other than Linux x86_64, use ./build.sh instead (needs the Go toolchain).
@@ -32,17 +39,24 @@ readonly tag="v${version}"
 readonly asset="omock-${tag}-linux-x86_64"
 readonly base="https://github.com/${repo}/releases/download/${tag}"
 
+# The trust anchor: a checksum committed to this repo, reviewed alongside the code.
+readonly pinned="$plugin_dir/checksums/$asset.sha256"
+[[ -f "$pinned" ]] ||
+  fail "no pinned checksum at checksums/$asset.sha256 — build from source with ./build.sh instead"
+read -r expected_digest _ < "$pinned"
+[[ "$expected_digest" =~ ^[0-9a-f]{64}$ ]] ||
+  fail "pinned checksum file is malformed: $pinned"
+
 workdir="$(mktemp -d)"
 # shellcheck disable=SC2064
 trap "rm -rf '$workdir'" EXIT
 
 curl --fail --location --silent --show-error --output "$workdir/$asset" "$base/$asset" ||
   fail "could not download $asset from release $tag"
-curl --fail --location --silent --show-error --output "$workdir/$asset.sha256" "$base/$asset.sha256" ||
-  fail "could not download the checksum for $asset"
 
+printf '%s  %s\n' "$expected_digest" "$asset" > "$workdir/$asset.sha256"
 ( cd "$workdir" && sha256sum --check --status "$asset.sha256" ) ||
-  fail "checksum mismatch for $asset — refusing to install"
+  fail "$asset does not match the pinned checksum — refusing to install (try ./build.sh)"
 
 install -Dm755 "$workdir/$asset" "$plugin_dir/bin/omock"
 

@@ -27,7 +27,7 @@ func testServer(t *testing.T, source string) (*httptest.Server, *Journal) {
 		t.Fatalf("load: %v", err)
 	}
 	j := NewJournal(50)
-	s := &Server{store: store, journal: j, logf: func(string, ...any) {}}
+	s := &Server{store: store, journal: j, logf: func(string, ...any) {}, webhookSem: make(chan struct{}, maxConcurrentWebhooks)}
 	ts := httptest.NewServer(http.HandlerFunc(s.handle))
 	t.Cleanup(ts.Close)
 	return ts, j
@@ -117,7 +117,7 @@ func TestHotReload(t *testing.T) {
 	store.StartWatching(20 * time.Millisecond)
 	defer store.StopWatching()
 
-	s := &Server{store: store, journal: NewJournal(10), logf: func(string, ...any) {}}
+	s := &Server{store: store, journal: NewJournal(10), logf: func(string, ...any) {}, webhookSem: make(chan struct{}, maxConcurrentWebhooks)}
 	ts := httptest.NewServer(http.HandlerFunc(s.handle))
 	defer ts.Close()
 
