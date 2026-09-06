@@ -18,21 +18,44 @@ or unmatched.
 
 ```
 manifest.json  Service.qml  BarWidget.qml  Model.js   the Omarchy plugin
-build.sh       dev-sync.sh                             build + local install
+install.sh                                             fetch the prebuilt omock helper
+build.sh       dev-sync.sh                             build from source / local install
 backend/                                               the Go mock engine (omock)
 examples/petstore.json                                 a sample mappings file
 ```
 
-## Install (local development)
+## Install
 
 ```bash
-./dev-sync.sh                         # build omock, copy into ~/.config/omarchy/plugins/, rescan
-omarchy plugin enable ireri.apimock right
-omarchy-shell shell rescanPlugins     # or: omarchy restart shell
+omarchy plugin add https://github.com/Duncan-Ireri/omarchy-apimock
+cd ~/.config/omarchy/plugins/ireri.apimock
+./install.sh                 # downloads the checksum-verified omock helper (Linux x86_64)
+#   …or, on another arch / to build from source (needs Go):
+#   ./build.sh
+omarchy plugin enable ireri.apimock
+omarchy restart shell
 ```
 
 Then set the mappings file and port in the widget's panel (or in Setup →
 Plugins → API Mock settings), and press **Start**.
+
+### Uninstall
+
+```bash
+omarchy plugin remove ireri.apimock
+```
+
+That removes the plugin directory and its bar entry. The plugin writes nothing
+outside `~/.config/omarchy/shell.json` (its own settings) and never touches
+system files.
+
+### Local development
+
+```bash
+./dev-sync.sh                 # build + copy into the plugins dir + rescan
+```
+
+Re-run after editing QML or Go.
 
 ## Standalone use
 

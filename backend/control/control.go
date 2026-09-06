@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/duncanireri/apimock/mock"
+	"github.com/duncan-ireri/omarchy-apimock/backend/mock"
 )
 
 const protocolVersion = 1

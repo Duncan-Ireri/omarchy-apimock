@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/duncanireri/apimock/control"
-	"github.com/duncanireri/apimock/mock"
+	"github.com/duncan-ireri/omarchy-apimock/backend/control"
+	"github.com/duncan-ireri/omarchy-apimock/backend/mock"
 )
 
 // version is set at build time via -ldflags "-X main.version=...".

@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: false
+
+      # Refuse a tag whose versions disagree: a mismatch means users install a
+      # plugin whose manifest and helper report different things.
+      - name: Verify versions and tag
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$version" == "$(jq -r '.version' manifest.json)" ]]
+          grep -q "^## $version" CHANGELOG.md
+          [[ "$(git rev-list -n 1 "$GITHUB_REF_NAME")" == "$GITHUB_SHA" ]]
+
+      - name: Test
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          test -z "$(gofmt -l .)"
+          go vet ./...
+          go test ./...
+
+      - name: Build helper
+        run: ./build.sh
+
+      - name: Inspect helper
+        run: |
+          set -euo pipefail
+          file ./bin/omock
+          # Static, CGO-free: nothing to resolve at load time on a user's machine.
+          ! ldd ./bin/omock 2>&1 | grep -qi "=>"
+          [[ "$(./bin/omock --version)" == "omock ${GITHUB_REF_NAME#v}" ]]
+
+      - name: Assemble assets
+        id: assets
+        run: |
+          set -euo pipefail
+          asset="omock-${GITHUB_REF_NAME}-linux-x86_64"
+          cp ./bin/omock "$asset"
+          sha256sum "$asset" > "$asset.sha256"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            ${{ steps.assets.outputs.asset }}
+            ${{ steps.assets.outputs.asset }}.sha256
