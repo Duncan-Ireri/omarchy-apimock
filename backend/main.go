@@ -51,7 +51,8 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, `omock %s — local API & webhook mock server
+	fmt.Fprintf(os.Stderr, `omock %s
+local mock server for APIs and webhooks
 
 usage:
   omock serve -f <file|dir> [-p PORT] [--host ADDR] [-v]
@@ -140,7 +141,7 @@ func cmdValidate(args []string) int {
 		log.Printf("invalid: %v", err)
 		return 1
 	}
-	fmt.Printf("ok — %d stub(s)\n", len(rs.Stubs))
+	fmt.Printf("ok, %d stub(s)\n", len(rs.Stubs))
 	for _, s := range rs.Summaries() {
 		fmt.Printf("  [%d] %-6s %s  (%s)\n", s.Priority, s.Method, s.URL, s.Name)
 	}

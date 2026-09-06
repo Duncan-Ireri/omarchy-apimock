@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "author": "duncanireri",
   "license": "MIT",
-  "description": "Local WireMock-style API & webhook mock server, driven from the Omarchy bar: point it at a JSON file of stubs, pick a port, watch requests live.",
+  "description": "Local mock server for APIs and webhooks, in WireMock's stub format. Point it at a JSON file, pick a port, run it from the bar.",
   "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "API Mock",
-    "description": "Start/stop a local mock server, choose a mappings file, watch matched and unmatched requests as they arrive.",
+    "description": "Start and stop a local mock server, pick its mappings file and port, and watch the requests it serves.",
     "category": "Developer Tools",
     "aliases": ["apimock", "mock", "wiremock"],
     "defaultSection": "right",

@@ -1,87 +1,57 @@
 # API Mock
 
-A local, WireMock-style HTTP mock server for building and testing APIs and
-webhooks — driven from the Omarchy bar, or run standalone from the terminal.
+A local HTTP mock server for working on APIs and webhooks. You give it a JSON
+file of stubs in WireMock's format and it serves them on a port you pick. There
+is an Omarchy bar widget to start and stop it and watch requests go by, and the
+`omock` binary runs on its own for scripts and CI.
 
-Point it at a JSON file of request → response stubs, choose a port, hit it from
-the app you're building. Requests show up in a live log as they arrive, matched
-or unmatched.
-
-- **Bar widget + panel** — start/stop the server, pick the mappings file, set
-  the port, watch requests, reload, validate.
-- **`omock` CLI** — the same engine without Omarchy, for scripts and CI.
-- **WireMock-compatible mappings** — most existing WireMock stub files load
-  as-is.
-- **Zero dependencies** — one static Go binary, stdlib only.
-
-## Layout
-
-```
-manifest.json  Service.qml  BarWidget.qml  Model.js   the Omarchy plugin
-install.sh                                             fetch the prebuilt omock helper
-build.sh       dev-sync.sh                             build from source / local install
-backend/                                               the Go mock engine (omock)
-examples/petstore.json                                 a sample mappings file
-```
+Existing WireMock stub files mostly load without changes. The binary is Go with
+no third-party dependencies.
 
 ## Install
 
 ```bash
 omarchy plugin add https://github.com/Duncan-Ireri/omarchy-apimock
 cd ~/.config/omarchy/plugins/ireri.apimock
-./install.sh                 # downloads the checksum-verified omock helper (Linux x86_64)
-#   …or, on another arch / to build from source (needs Go):
-#   ./build.sh
+./install.sh
 omarchy plugin enable ireri.apimock
 omarchy restart shell
 ```
 
-Then set the mappings file and port in the widget's panel (or in Setup →
-Plugins → API Mock settings), and press **Start**.
+`install.sh` downloads the `omock` binary from the GitHub release and checks its
+SHA-256. There is only a Linux x86_64 build; on anything else run `./build.sh`,
+which needs the Go toolchain.
 
-### Uninstall
+Set the mappings path and port in the widget panel (or under Setup → Plugins →
+API Mock), then press Start.
 
-```bash
-omarchy plugin remove ireri.apimock
-```
+To remove it, `omarchy plugin remove ireri.apimock`. That deletes the plugin
+directory and its bar entry. The only file the plugin writes is its own section
+of `~/.config/omarchy/shell.json`.
 
-That removes the plugin directory and its bar entry. The plugin writes nothing
-outside `~/.config/omarchy/shell.json` (its own settings) and never touches
-system files.
-
-### Local development
-
-```bash
-./dev-sync.sh                 # build + copy into the plugins dir + rescan
-```
-
-Re-run after editing QML or Go.
-
-## Standalone use
+## Without Omarchy
 
 ```bash
 ./build.sh
 ./bin/omock serve -f examples/petstore.json -p 8080 -v
-curl localhost:8080/pets/1
-
 ./bin/omock validate -f examples/petstore.json
 ```
 
-The server hot-reloads whenever the mappings file (or any `*.json` in the
-mappings folder) changes on disk.
+`serve` re-reads the mappings whenever the file, or any `.json` in the folder
+you pointed it at, changes on disk.
 
-## Mappings format
+## Mappings
 
-A file is `{ "mappings": [ <stub>, ... ] }`, a bare `[ <stub>, ... ]`, or a
-single `<stub>`. A directory loads every `*.json` inside it.
+The file is `{"mappings": [ <stub>, ... ]}`. A bare array or a single stub object
+also work, and if you point at a directory it loads every `.json` in it.
 
 ```jsonc
 {
   "name": "get pet by id",
-  "priority": 5,                       // lower wins; default 5
+  "priority": 5,                        // lower wins, default 5
   "request": {
-    "method": "GET",                   // verb, or "ANY"
-    "urlPathPattern": "/pets/[0-9]+",  // or urlPath / url / urlPattern
+    "method": "GET",                    // or "ANY"
+    "urlPathPattern": "/pets/[0-9]+",   // or urlPath, url, urlPattern
     "queryParameters": { "detail": { "equalTo": "full" } },
     "headers": { "Accept": { "contains": "json" } },
     "bodyPatterns": [
@@ -91,34 +61,29 @@ single `<stub>`. A directory loads every `*.json` inside it.
   "response": {
     "status": 200,
     "headers": { "Content-Type": "application/json" },
-    "jsonBody": { "id": 1, "name": "Rex" },   // or body / base64Body / bodyFileName
+    "jsonBody": { "id": 1, "name": "Rex" },   // or body, base64Body, bodyFileName
     "fixedDelayMilliseconds": 0
   }
 }
 ```
 
-### Matchers
+URL matching uses the first of these that is present: `urlPath` (exact path),
+`urlPathPattern` (regex against the path), `url` (exact path and query),
+`urlPattern` (regex against both).
 
-`equalTo` (+ `caseInsensitive`), `contains`, `matches` (regex),
-`doesNotMatch`, `absent`, `equalToJson` (+ `ignoreArrayOrder`,
-`ignoreExtraElements`), `matchesJsonPath` (string, or
-`{ "expression", "equalTo" }`). The JSONPath subset supports `$`, `.key`,
-`['key']` and `[n]`.
+Value matchers, used for query parameters, headers, cookies and body patterns:
+`equalTo` (with optional `caseInsensitive`), `contains`, `matches`,
+`doesNotMatch`, `absent`, `equalToJson` (with `ignoreArrayOrder` and
+`ignoreExtraElements`), and `matchesJsonPath`. JSONPath support is a subset:
+`$`, `.key`, `['key']`, `[n]`.
 
-### URL matching (first one present wins)
+A request that matches nothing returns 404 with an `X-Apimock-Unmatched` header
+and a body listing the stubs that came closest and where each one diverged.
 
-`urlPath` (exact path) · `urlPathPattern` (regex on path) · `url` (exact path +
-query) · `urlPattern` (regex on path + query).
+### Webhooks
 
-### Unmatched requests
-
-Return `404` with `X-Apimock-Unmatched: true` and a JSON body naming the
-closest stubs and why each missed.
-
-### Webhooks (`postServeActions`)
-
-After the response is sent, fire an outbound HTTP call — for testing a webhook
-receiver in the app you're building:
+`postServeActions` sends an HTTP request after the response goes out, which
+helps when the code you are testing expects a callback:
 
 ```json
 "postServeActions": [
@@ -127,7 +92,6 @@ receiver in the app you're building:
     "parameters": {
       "method": "POST",
       "url": "http://127.0.0.1:4000/webhooks/orders",
-      "headers": { "Content-Type": "application/json" },
       "jsonBody": { "event": "order.created", "id": 123 },
       "delayMilliseconds": 250
     }
@@ -135,19 +99,22 @@ receiver in the app you're building:
 ]
 ```
 
-## Not yet supported
+## What it does not do
 
-Response templating (`{{request.*}}`), proxy/record mode, the verification
-admin API, stateful scenarios, more than one server at a time.
+No response templating, no proxy or record mode, no admin or verification API,
+no stateful scenarios, one server at a time. Reach for WireMock itself if you
+need those.
 
-## Security
+## Notes
 
-The `omock` helper runs unsandboxed inside `omarchy-shell` with your user
-permissions, like every Omarchy plugin. It only listens on the address you
-configure (`127.0.0.1` by default), reads the mappings file you point it at,
-and — if a stub declares one — makes the outbound webhook call that stub
-specifies.
+Like every Omarchy plugin, `omock` runs inside `omarchy-shell` with your user
+account's permissions and is not sandboxed. It listens on the address in its
+settings (127.0.0.1 unless you change it), reads the mappings file you gave it,
+and only makes a webhook call when a stub asks for one.
+
+To work on the plugin, `./dev-sync.sh` builds it and copies it into the plugins
+directory and triggers a reload. Run it again after each change.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT.

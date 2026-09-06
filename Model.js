@@ -4,8 +4,8 @@
 //
 // QML loads this with `import "Model.js" as Model`.
 
-// Coerce anything list-shaped (including QML sequence wrappers, on which
-// Array.isArray lies) into a real array.
+// Turn anything list-shaped into a real array, including the QML sequence
+// wrappers that Array.isArray does not recognise.
 function asList(value) {
   if (!value) return []
   if (Array.isArray(value)) return value
@@ -43,8 +43,8 @@ function barEntry(config, pluginId) {
   return null
 }
 
-// Effective, clamped settings — bounds match what the helper accepts, so the
-// panel can never show a value the helper would reject.
+// Effective settings, clamped to the same bounds the helper enforces so the
+// panel never shows a value the helper would reject.
 function settingsIn(settings) {
   var raw = settings && typeof settings === "object" ? settings : {}
   return {
@@ -65,8 +65,8 @@ function clamp(value, low, high) {
   return Math.max(low, Math.min(high, Math.round(value)))
 }
 
-// Parse one line of JSON from the helper. Returns null on anything malformed —
-// a partial write or a stray log line is expected, not exceptional.
+// Parse one line of JSON from the helper. Returns null on anything malformed;
+// a partial write or a stray log line is normal here.
 function parseLine(line) {
   var text = String(line || "").trim()
   if (text === "" || (text[0] !== "{" && text[0] !== "[")) return null
@@ -118,7 +118,7 @@ function expandTilde(path, home) {
   return p
 }
 
-// "2s" / "4m" / "1h" — coarse, because the log is a stream not a stopwatch.
+// "2s" / "4m" / "1h". Coarse on purpose; the log is a stream, not a stopwatch.
 function fmtAgo(seconds) {
   var s = Math.max(0, Math.floor(Number(seconds) || 0))
   if (s < 60) return s + "s"
@@ -155,9 +155,9 @@ function baseName(path) {
   return slash < 0 ? p : p.slice(slash + 1)
 }
 
-// The subset of the settings the plugin panel owns and writes back to
-// shell.json. Kept narrow so Omarchy's own bar-widget settings editor, which
-// writes the same entry from the manifest schema, is never clobbered.
+// The settings the panel writes back to shell.json. Kept to the keys this
+// plugin owns so it does not clobber what Omarchy's own bar-widget settings
+// editor writes into the same entry from the manifest schema.
 function persistPayload(mappings, host, port) {
   return {
     mappings: String(mappings || "").trim(),
