@@ -45,8 +45,10 @@ jobs:
       - name: Handshake
         run: |
           set -euo pipefail
-          out=$(echo '{"id":1,"cmd":"hello","version":"0.1.0"}' \
-            | timeout 20 ./bin/omock control | head -1)
+          # `head` closes the pipe, so omock takes SIGPIPE on its next write —
+          # expected; `|| true` keeps pipefail from failing the step.
+          out=$( (echo '{"id":1,"cmd":"hello","version":"0.1.0"}' \
+            | timeout 20 ./bin/omock control | head -n1) || true )
           echo "$out"
           echo "$out" | grep -q '"ev":"ready"'
 
