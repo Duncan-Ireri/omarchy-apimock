@@ -5,11 +5,10 @@ import "Model.js" as Model
 
 // One mock engine per shell session.
 //
-// The bar builds its widgets once per monitor. A helper owned by the widget
-// would be started once per screen — two processes fighting for the same TCP
-// port. The shell loads a `service` kind exactly once, so the helper, the live
-// state and the IPC target live here; every BarWidget.qml is a view onto this
-// object.
+// The bar builds its widgets once per monitor, so a helper owned by the widget
+// would start once per screen: two processes contending for the same TCP port.
+// The shell loads a `service` kind exactly once, so the helper, the live state
+// and the IPC target live here. Every BarWidget.qml is a view onto this object.
 Item {
   id: root
 
@@ -26,9 +25,9 @@ Item {
 
   readonly property string home: Quickshell.env("HOME") || ""
 
-  // Configuration comes from shell.json, not from the widgets — the bar injects
+  // Configuration comes from shell.json, not from the widgets. The bar injects
   // a widget's `settings` a tick after creation, so a widget's first report is
-  // the default, not the persisted value.
+  // the default rather than the persisted value.
   readonly property var configEntry: shell && shell.shellConfig
     ? Model.barEntry(shell.shellConfig, manifestPluginId)
     : null

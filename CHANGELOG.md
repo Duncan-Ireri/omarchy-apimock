@@ -1,23 +1,17 @@
 # Changelog
 
-## 0.1.0
+## 0.1.0 — 2026-09-06
 
-Initial release.
+First release.
 
-- WireMock-style local mock server (`omock`), zero external dependencies.
-  - `omock serve -f <file|dir> -p <port>` — standalone server with mtime hot-reload.
-  - `omock validate -f <file|dir>` — parse-check mappings, non-zero exit on failure.
-  - `omock control` — JSON-lines protocol used by the Omarchy plugin.
-- Matching: `method`, `urlPath` / `urlPathPattern` / `url` / `urlPattern`,
-  `queryParameters` / `headers` / `cookies` matchers
-  (`equalTo` + `caseInsensitive`, `contains`, `matches`, `doesNotMatch`,
-  `absent`), `bodyPatterns` including `equalToJson`
-  (`ignoreArrayOrder` / `ignoreExtraElements`) and a `matchesJsonPath` subset,
-  `priority`.
-- Responses: `status`, `headers`, `jsonBody` / `body` / `base64Body` /
-  `bodyFileName`, `fixedDelayMilliseconds`.
-- `postServeActions` outbound webhooks.
-- Unmatched requests return `404` with `X-Apimock-Unmatched` and a
-  closest-miss diagnostic body.
-- Omarchy bar widget + panel: start/stop, mappings path, port, stub list,
-  live request log, reload, validate. Settings persist to `shell.json`.
+The mock server handles WireMock-style matching (method; the `urlPath`,
+`urlPathPattern`, `url` and `urlPattern` forms; query, header, cookie and body
+matchers including `equalToJson` and a `matchesJsonPath` subset; `priority`) and
+builds responses from JSON, a string, base64 or a file, with an optional delay.
+`postServeActions` sends an outbound webhook. It watches the mappings file so
+edits take effect without a restart, and answers an unmatched request with a 404
+that says which stubs came closest.
+
+Ships as the `omock` binary (`serve`, `validate`, and the `control` protocol the
+plugin speaks) and an Omarchy bar widget that starts and stops the server and
+shows requests as they arrive. Widget settings are stored in `shell.json`.

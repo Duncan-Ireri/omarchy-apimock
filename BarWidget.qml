@@ -5,8 +5,8 @@ import qs.Commons
 import "Model.js" as Model
 
 // The bar button and its popup, built once per monitor. It owns no helper and
-// no state that matters — all of that lives in Service.qml, loaded once by the
-// shell. This is a view onto that engine plus this popup's own open state.
+// no shared state; that all lives in Service.qml, which the shell loads once.
+// This is a view onto that engine plus this popup's own open state.
 Panel {
   id: root
   moduleName: "ireri.apimock"
@@ -269,7 +269,7 @@ Panel {
             to: 65535
             value: root.draftPort
             onModified: function(v) { root.draftPort = v; root.commitSettings() }
-            // A port is not a quantity — drop the locale's thousands separator.
+            // Show the port as a plain number, no thousands separator.
             Component.onCompleted: field.textFromValue = function(v, locale) { return "" + v }
           }
 
