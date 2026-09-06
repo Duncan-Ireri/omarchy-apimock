@@ -13,7 +13,13 @@ import (
 // render writes the stub's response to w. baseDir resolves bodyFileName.
 func (resp *Response) render(w http.ResponseWriter, baseDir string) (int, error) {
 	if resp.FixedDelayMs > 0 {
-		time.Sleep(time.Duration(resp.FixedDelayMs) * time.Millisecond)
+		d := time.Duration(resp.FixedDelayMs) * time.Millisecond
+		// The server sets a WriteTimeout to fend off slow clients; a stub that
+		// asks for a delay is a deliberate wait, so push this connection's write
+		// deadline out past it. SetWriteDeadline is best-effort (unsupported on
+		// the recorder used in some tests) — ignore the error.
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(d + 30*time.Second))
+		time.Sleep(d)
 	}
 
 	body, ctype, err := resp.bodyBytes(baseDir)

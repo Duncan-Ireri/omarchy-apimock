@@ -8,9 +8,16 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
+
+// maxConcurrentWebhooks caps the webhook goroutines in flight at once. Each
+// served request can queue post-serve webhooks; without a ceiling a burst of
+// traffic (more likely once the bind address is not loopback) spawns unbounded
+// goroutines and outbound sockets. Webhooks past the cap are dropped and logged.
+const maxConcurrentWebhooks = 32
 
 // Server is a running mock HTTP endpoint backed by a Store.
 type Server struct {
@@ -25,10 +32,12 @@ type Server struct {
 	mu      sync.Mutex
 	running bool
 
-	// wg tracks in-flight webhook goroutines so Stop can wait for them.
+	// wg tracks in-flight webhook goroutines so Stop can wait for them; sem
+	// bounds how many run at once (see maxConcurrentWebhooks).
 	webhookCtx    context.Context
 	webhookCancel context.CancelFunc
 	webhookWG     sync.WaitGroup
+	webhookSem    chan struct{}
 
 	// OnRequest, if set, is called for every served request (for live streaming).
 	OnRequest func(JournalEntry)
@@ -40,10 +49,11 @@ func NewServer(host string, port int, store *Store, journal *Journal) *Server {
 		host = "127.0.0.1"
 	}
 	return &Server{
-		Addr:    fmt.Sprintf("%s:%d", host, port),
-		store:   store,
-		journal: journal,
-		logf:    func(string, ...any) {},
+		Addr:       fmt.Sprintf("%s:%d", host, port),
+		store:      store,
+		journal:    journal,
+		logf:       func(string, ...any) {},
+		webhookSem: make(chan struct{}, maxConcurrentWebhooks),
 	}
 }
 
@@ -77,6 +87,10 @@ func (s *Server) Start() error {
 	s.httpSrv = &http.Server{
 		Handler:           http.HandlerFunc(s.handle),
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 	s.running = true
 	s.mu.Unlock()
@@ -141,7 +155,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 
 	if matched != nil {
 		status, _ = matched.Response.render(w, baseDir)
-		s.fireWebhooks(matched, in)
+		s.fireWebhooks(matched)
 	} else {
 		status = http.StatusNotFound
 		writeNotMatched(w, in, misses, rs == nil, s.store.LastError())
@@ -165,16 +179,28 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	s.logf("%s %s -> %d (%s)", entry.Method, entry.URL, status, matchWord(matched))
 }
 
-func (s *Server) fireWebhooks(stub *Stub, in *matchInput) {
+func (s *Server) fireWebhooks(stub *Stub) {
+	ctx := s.webhookCtx
+	if ctx == nil { // constructed without Start (tests); no lifecycle to cancel
+		ctx = context.Background()
+	}
 	for _, action := range stub.PostServeActions {
 		spec := action.spec()
 		if spec == nil || spec.URL == "" {
 			continue
 		}
+		select {
+		case s.webhookSem <- struct{}{}:
+		default:
+			s.logf("webhook %s %s dropped: %d already in flight",
+				strings.ToUpper(spec.Method), spec.URL, cap(s.webhookSem))
+			continue
+		}
 		s.webhookWG.Add(1)
 		go func() {
 			defer s.webhookWG.Done()
-			res := spec.fire(s.webhookCtx)
+			defer func() { <-s.webhookSem }()
+			res := spec.fire(ctx)
 			if res.Err != nil {
 				s.logf("webhook %s %s failed: %v", res.Method, res.URL, res.Err)
 			} else {
