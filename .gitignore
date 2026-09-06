@@ -1,0 +1,5 @@
+/bin/
+backend/apimock
+*.test
+*.out
+.DS_Store

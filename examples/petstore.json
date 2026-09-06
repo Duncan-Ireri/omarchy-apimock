@@ -1,0 +1,91 @@
+{
+  "mappings": [
+    {
+      "name": "get pet by id",
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/pets/[0-9]+"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": {
+          "id": 1,
+          "name": "Rex",
+          "status": "available"
+        }
+      }
+    },
+    {
+      "name": "list sold pets",
+      "request": {
+        "method": "GET",
+        "urlPath": "/pets",
+        "queryParameters": {
+          "status": { "equalTo": "sold" }
+        }
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": [
+          { "id": 7, "name": "Biscuit", "status": "sold" }
+        ]
+      }
+    },
+    {
+      "name": "list pets",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/pets"
+      },
+      "response": {
+        "status": 200,
+        "jsonBody": [
+          { "id": 1, "name": "Rex", "status": "available" },
+          { "id": 7, "name": "Biscuit", "status": "sold" }
+        ]
+      }
+    },
+    {
+      "name": "create pet",
+      "request": {
+        "method": "POST",
+        "urlPath": "/pets",
+        "headers": {
+          "Content-Type": { "contains": "application/json" }
+        },
+        "bodyPatterns": [
+          { "matchesJsonPath": { "expression": "$.name", "equalTo": "Rex" } }
+        ]
+      },
+      "response": {
+        "status": 201,
+        "headers": { "Location": "/pets/99" },
+        "jsonBody": { "id": 99, "name": "Rex", "status": "available" },
+        "fixedDelayMilliseconds": 50
+      }
+    },
+    {
+      "name": "webhook on order",
+      "request": {
+        "method": "POST",
+        "urlPath": "/orders"
+      },
+      "response": {
+        "status": 202,
+        "jsonBody": { "accepted": true }
+      },
+      "postServeActions": [
+        {
+          "name": "webhook",
+          "parameters": {
+            "method": "POST",
+            "url": "http://127.0.0.1:9099/hooks/order-created",
+            "headers": { "Content-Type": "application/json" },
+            "jsonBody": { "event": "order.created", "id": 1234 }
+          }
+        }
+      ]
+    }
+  ]
+}
